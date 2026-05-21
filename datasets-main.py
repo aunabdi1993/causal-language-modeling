@@ -13,6 +13,8 @@ OUTPUT_DIR   = "./output"
 import httpx
 from huggingface_hub import set_client_factory
 
+import math
+
 tokenizer = AutoTokenizer.from_pretrained("distilbert/distilgpt2")
 model = AutoModelForCausalLM.from_pretrained("distilbert/distilgpt2")
 
@@ -82,3 +84,8 @@ trainer = Trainer(
 )
 
 trainer.train()
+
+eval_results = trainer.evaluate()
+print(f"Perplexity: {math.exp(eval_results['eval_loss']):.2f}")
+
+trainer.push_to_hub()
