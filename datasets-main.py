@@ -1,6 +1,14 @@
 from datasets import load_dataset
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import (
+    AutoTokenizer,
+    DataCollatorForLanguageModeling,
+    AutoModelForCausalLM,
+    TrainingArguments,
+    Trainer
+)
+
+OUTPUT_DIR   = "./output"
 
 import httpx
 from huggingface_hub import set_client_factory
@@ -21,7 +29,7 @@ dataset = load_dataset("dany0407/eli5_category", split="train[:5000]")
 eli5 = dataset.flatten()
 
 def preprocess_function(examples):
-    return tokenizer([" ".join(x) for x in examples["answers.text"]])
+    return tokenizer([" ".join(x) for x in examples["answers.text"]],truncation=True, max_length=1024)
 
 block_size = 128
 
@@ -49,11 +57,28 @@ tokenized_eli5 = eli5.map(
 
 
 # Step 2: group into blocks
-tokenized_eli5 = eli5.map(
+tokenized_eli5 = tokenized_eli5.map(
     group_texts,
     batched=True,
     num_proc=4,
 )
 
-print(tokenized_eli5)
+tokenizer.pad_token = tokenizer.eos_token
+data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
+training_args = TrainingArguments(
+    output_dir=OUTPUT_DIR,
+    eval_strategy="no",
+    learning_rate=2e-5,
+    weight_decay=0.01,
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_eli5,
+    data_collator=data_collator,
+    processing_class=tokenizer,
+)
+
+trainer.train()
